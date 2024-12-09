@@ -2,7 +2,8 @@
 #include <commdlg.h>
 #include <commctrl.h>
 #include <cstdio>
-#include "resource.h" // Inclui o cabeçalho de recursos com identificadores
+#include <iostream> // Incluído para depuração
+#include "resource.h"
 
 #define ID_FILE_OPEN  1
 #define ID_FILE_SAVE  2
@@ -28,6 +29,7 @@ void UpdateStatusBar(const char* fileStatus, int line = -1, int col = -1) {
         strcpy(statusText, fileStatus); // Exibe apenas o texto do arquivo
     }
 
+    std::cout << "Atualizando barra de status: " << statusText << std::endl; // Depuração
     SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)statusText);
 }
 
@@ -48,6 +50,9 @@ void UpdateCursorPos(HWND hwndEdit) {
 
     // Calcula a coluna
     int col = selStart - lineStart;
+
+    // Depuração: Mostra os valores calculados
+    std::cout << "UpdateCursorPos chamado: Linha = " << line + 1 << ", Coluna = " << col + 1 << std::endl;
 
     // Atualiza a barra de status com as informações de linha e coluna
     UpdateStatusBar(currentFilePath[0] ? currentFilePath : "Sem arquivo", line, col);
@@ -85,6 +90,7 @@ void SaveFile(HWND hwnd) {
     if (file) {
         fwrite(buffer, 1, strlen(buffer), file); // Escreve o texto no arquivo
         fclose(file);
+        std::cout << "Arquivo salvo: " << currentFilePath << std::endl; // Depuração
     }
 
     free(buffer);
@@ -93,12 +99,27 @@ void SaveFile(HWND hwnd) {
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+// Callback para o controle de edição (Captura teclas direcionais)             //
+/////////////////////////////////////////////////////////////////////////////////
+LRESULT CALLBACK EditProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    static WNDPROC oldProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
+    switch (uMsg) {
+        case WM_KEYUP: // Captura teclas como Up, Down, Left, Right
+            std::cout << "WM_KEYUP no controle de edição: Tecla pressionada." << std::endl; // Depuração
+            UpdateCursorPos(hwnd);
+            break;
+    }
+
+    return CallWindowProc(oldProc, hwnd, uMsg, wParam, lParam);
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 // Callback para processar eventos da janela principal                         //
 /////////////////////////////////////////////////////////////////////////////////
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
         case WM_CREATE: {
-            // Cria o controle de edição
             hEdit = CreateWindow(
                 "EDIT", "",
                 WS_CHILD | WS_VISIBLE | WS_BORDER | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL,
@@ -106,7 +127,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 hwnd, (HMENU) ID_EDIT_TEXT, NULL, NULL
             );
 
-            // Cria a barra de status
+            // Substitui o procedimento padrão do controle de edição
+            SetWindowLongPtr(hEdit, GWLP_USERDATA, (LONG_PTR)SetWindowLongPtr(hEdit, GWLP_WNDPROC, (LONG_PTR)EditProc));
+
             hStatus = CreateWindowEx(
                 0, STATUSCLASSNAME, NULL,
                 WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
@@ -125,10 +148,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int statusHeight = 20; // Altura da barra de status
             int editHeight = rect.bottom - statusHeight;
 
-            // Ajusta o tamanho do controle de edição
             MoveWindow(hEdit, 0, 0, rect.right, editHeight, TRUE);
-
-            // Ajusta o tamanho da barra de status
             MoveWindow(hStatus, 0, editHeight, rect.right, statusHeight, TRUE);
         }
         break;
@@ -136,10 +156,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
                 case ID_FILE_NEW:
-                    SetWindowText(hEdit, ""); // Limpa o editor
-                    strcpy(currentFilePath, ""); // Limpa o caminho do arquivo
+                    SetWindowText(hEdit, "");
+                    strcpy(currentFilePath, "");
                     UpdateStatusBar("Novo arquivo");
-                    UpdateCursorPos(hEdit); // Atualiza posição ao criar novo arquivo
                     break;
 
                 case ID_FILE_OPEN: {
@@ -162,33 +181,27 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                             buffer[fileSize] = '\0';
                             fclose(file);
 
-                            SetWindowText(hEdit, buffer); // Insere texto no editor
+                            SetWindowText(hEdit, buffer);
                             free(buffer);
 
-                            strcpy(currentFilePath, fileName); // Atualiza o caminho do arquivo
-                            UpdateCursorPos(hEdit); // Atualiza posição ao abrir arquivo
+                            strcpy(currentFilePath, fileName);
                         }
                     }
                 }
                 break;
 
                 case ID_FILE_SAVE:
-                    SaveFile(hwnd); // Chama a função de salvar
+                    SaveFile(hwnd);
                     break;
 
                 case ID_FILE_EXIT:
-                    PostQuitMessage(0); // Sai do aplicativo
+                    PostQuitMessage(0);
                     break;
             }
             break;
 
-        case WM_KEYUP:  // Captura eventos de teclas
-        case WM_LBUTTONUP:  // Captura cliques do mouse
-            UpdateCursorPos(hEdit); // Atualiza a posição do cursor na barra de status
-            break;
-
         case WM_DESTROY:
-            PostQuitMessage(0); // Encerra a aplicação
+            PostQuitMessage(0);
             break;
 
         default:
@@ -209,16 +222,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
 
-    // Adiciona o ícone grande e pequeno
-    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON)); // Ícone grande
-    wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0); // Ícone pequeno
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APP_ICON));
+    wc.hIconSm = (HICON)LoadImage(hInstance, MAKEINTRESOURCE(IDI_APP_ICON), IMAGE_ICON, 16, 16, 0);
 
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
     RegisterClassEx(&wc);
 
-    // Cria o menu
     HMENU hMenu = CreateMenu();
     HMENU hFileMenu = CreateMenu();
     AppendMenu(hFileMenu, MF_STRING, ID_FILE_OPEN, "Abrir\tCtrl-O");
@@ -227,7 +238,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     AppendMenu(hFileMenu, MF_STRING, ID_FILE_EXIT, "Sair\tCtrl-Q");
     AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, "Arquivo");
 
-    // Configura a tabela de atalhos
     ACCEL accTable[] = {
         { FCONTROL | FVIRTKEY, 'O', ID_FILE_OPEN },
         { FCONTROL | FVIRTKEY, 'S', ID_FILE_SAVE },
@@ -236,19 +246,18 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     };
     HACCEL hAccel = CreateAcceleratorTable(accTable, 4);
 
-    // Cria a janela principal
     HWND hwnd = CreateWindowEx(
         0, CLASS_NAME, "Editor de Texto Simples",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
-        NULL, hMenu, hInstance, NULL // Associa o menu à janela
+        NULL, hMenu, hInstance, NULL
     );
 
     ShowWindow(hwnd, nCmdShow);
 
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0)) {
-        if (!TranslateAccelerator(hwnd, hAccel, &msg)) { // Processa atalhos
+        if (!TranslateAccelerator(hwnd, hAccel, &msg)) {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
