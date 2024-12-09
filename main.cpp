@@ -54,6 +54,45 @@ void UpdateCursorPos(HWND hwndEdit) {
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+// Função para salvar o texto no arquivo atual ou em um novo arquivo           //
+/////////////////////////////////////////////////////////////////////////////////
+void SaveFile(HWND hwnd) {
+    if (strlen(currentFilePath) == 0) { // Se não houver arquivo atual, abrir "Salvar Como"
+        OPENFILENAME ofn;
+        char fileName[MAX_PATH] = "";
+
+        ZeroMemory(&ofn, sizeof(ofn));
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = hwnd;
+        ofn.lpstrFilter = "Text Files\0*.txt\0All Files\0*.*\0";
+        ofn.lpstrFile = fileName;
+        ofn.nMaxFile = MAX_PATH;
+        ofn.Flags = OFN_OVERWRITEPROMPT;
+
+        if (GetSaveFileName(&ofn)) {
+            strcpy(currentFilePath, fileName); // Atualiza o caminho do arquivo
+        } else {
+            return; // O usuário cancelou a operação
+        }
+    }
+
+    // Salva o texto no arquivo atual
+    int length = GetWindowTextLength(hEdit); // Obtém o tamanho do texto
+    char* buffer = (char*)malloc(length + 1);
+    GetWindowText(hEdit, buffer, length + 1); // Obtém o texto do editor
+
+    FILE* file = fopen(currentFilePath, "wb");
+    if (file) {
+        fwrite(buffer, 1, strlen(buffer), file); // Escreve o texto no arquivo
+        fclose(file);
+    }
+
+    free(buffer);
+
+    UpdateStatusBar(currentFilePath); // Atualiza a barra de status
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 // Callback para processar eventos da janela principal                         //
 /////////////////////////////////////////////////////////////////////////////////
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -134,7 +173,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 break;
 
                 case ID_FILE_SAVE:
-                    // Implemente a funcionalidade de salvar
+                    SaveFile(hwnd); // Chama a função de salvar
                     break;
 
                 case ID_FILE_EXIT:
@@ -144,7 +183,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
 
         case WM_KEYUP:  // Captura eventos de teclas
-        case WM_CHAR:   // Captura entrada de texto
         case WM_LBUTTONUP:  // Captura cliques do mouse
             UpdateCursorPos(hEdit); // Atualiza a posição do cursor na barra de status
             break;
