@@ -29,7 +29,7 @@ void UpdateStatusBar(const char* fileStatus, int line = -1, int col = -1) {
         strcpy(statusText, fileStatus); // Exibe apenas o texto do arquivo
     }
 
-    std::cout << "Atualizando barra de status: " << statusText << std::endl; // Depuração
+    //std::cout << "Atualizando barra de status: " << statusText << std::endl; // Depuração
     SendMessage(hStatus, SB_SETTEXT, 0, (LPARAM)statusText);
 }
 
@@ -52,7 +52,7 @@ void UpdateCursorPos(HWND hwndEdit) {
     int col = selStart - lineStart;
 
     // Depuração: Mostra os valores calculados
-    std::cout << "UpdateCursorPos chamado: Linha = " << line + 1 << ", Coluna = " << col + 1 << std::endl;
+    //std::cout << "UpdateCursorPos chamado: Linha = " << line + 1 << ", Coluna = " << col + 1 << std::endl;
 
     // Atualiza a barra de status com as informações de linha e coluna
     UpdateStatusBar(currentFilePath[0] ? currentFilePath : "Sem arquivo", line, col);
@@ -90,7 +90,7 @@ void SaveFile(HWND hwnd) {
     if (file) {
         fwrite(buffer, 1, strlen(buffer), file); // Escreve o texto no arquivo
         fclose(file);
-        std::cout << "Arquivo salvo: " << currentFilePath << std::endl; // Depuração
+        //std::cout << "Arquivo salvo: " << currentFilePath << std::endl; // Depuração
     }
 
     free(buffer);
@@ -106,7 +106,7 @@ LRESULT CALLBACK EditProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
     switch (uMsg) {
         case WM_KEYUP: // Captura teclas como Up, Down, Left, Right
-            std::cout << "WM_KEYUP no controle de edição: Tecla pressionada." << std::endl; // Depuração
+            //std::cout << "WM_KEYUP no controle de edição: Tecla pressionada." << std::endl; // Depuração
             UpdateCursorPos(hwnd);
             break;
     }
