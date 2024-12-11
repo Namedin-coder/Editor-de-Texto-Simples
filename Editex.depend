@@ -13,16 +13,20 @@
 1733698419 source:d:\70-79 programa플o\70 programas em c_c++\70.05 rapidxml_library\winaula\resource.rc
 	"resource.h"
 
-1733788590 source:d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\main.cpp
+1733940532 source:d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\main.cpp
 	<windows.h>
 	<commdlg.h>
 	<commctrl.h>
 	<cstdio>
 	<iostream>
+	<string>
 	"resource.h"
 
-1733696600 d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\resource.h
+1733933121 d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\resource.h
 
-1733855014 source:d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\resource.rc
+1733933256 source:d:\70-79 programa플o\70 programas em c_c++\70.06 editor de texto simples\resource.rc
+	<windows.h>
+	<commctrl.h>
+	<richedit.h>
 	"resource.h"
 

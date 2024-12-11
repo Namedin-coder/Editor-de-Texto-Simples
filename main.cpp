@@ -1,20 +1,150 @@
-#include <windows.h>
-#include <commdlg.h>
-#include <commctrl.h>
-#include <cstdio>
-#include <iostream> // Incluído para depuração
+#include <windows.h>  // Necessário para a API do Windows.
+#include <commdlg.h>  // Necessário para diálogos comuns como Abrir e Salvar.
+#include <commctrl.h> // Necessário para controles como a barra de status.
+#include <cstdio>     // Necessário para funções C de manipulação de arquivos (fopen, fread, etc.).
+#include <iostream>   // Necessário para depuração com std::cout.
+#include <string>     // Necessário para manipulação de strings modernas em C++.
+
 #include "resource.h"
 
+// Identificadores de Menus
 #define ID_FILE_OPEN  1
 #define ID_FILE_SAVE  2
 #define ID_FILE_NEW   3
 #define ID_FILE_EXIT  4
+
+// Identificadores de Controles
 #define ID_EDIT_TEXT  101
+
+// Identificadores de Recursos
 #define IDI_APP_ICON  101
+
+// Identificadores de Pesquisa e Substituição
+#define ID_FIND       201
+#define ID_REPLACE    202
+
 
 static HWND hStatus; // Barra de status
 static HWND hEdit;   // Área de edição
 static char currentFilePath[MAX_PATH] = ""; // Caminho do arquivo atual
+
+/////////////////////////////////////////////////////////////////////////////////
+// Função para abrir o diálogo de pesquisa                                     //
+/////////////////////////////////////////////////////////////////////////////////
+void FindText(HWND hwnd) {
+    char findText[128] = "";
+
+    // Cria uma caixa de diálogo para entrada do texto a ser pesquisado
+    if (DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_FIND), hwnd, [](HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) -> INT_PTR {
+        static char* pFindText = nullptr;
+        switch (uMsg) {
+            case WM_INITDIALOG:
+                pFindText = reinterpret_cast<char*>(lParam);
+                return TRUE;
+
+            case WM_COMMAND:
+                if (LOWORD(wParam) == IDOK) {
+                    GetDlgItemText(hDlg, IDC_EDIT1, pFindText, 128);
+
+                    // Depuração: Mostra o texto capturado do diálogo
+                    std::cout << "Texto capturado do diálogo: " << pFindText << std::endl;
+
+                    EndDialog(hDlg, IDOK);
+                } else if (LOWORD(wParam) == IDCANCEL) {
+                    EndDialog(hDlg, IDCANCEL);
+                }
+                break;
+        }
+        return FALSE;
+    }, (LPARAM)findText) == IDOK) {
+        // Localiza o texto no controle de edição
+        int length = GetWindowTextLength(hEdit);
+        char* buffer = (char*)malloc(length + 1);
+        GetWindowText(hEdit, buffer, length + 1);
+
+        // Depuração: Mostra o texto do editor
+        std::cout << "Texto do editor: " << buffer << std::endl; // Depuração
+
+        // Localiza o texto no editor
+        char* pos = strstr(buffer, findText);
+        if (pos) {
+            int start = pos - buffer;
+            int end = start + strlen(findText);
+
+            // Validar os índices
+            if (start >= 0 && end <= length) {
+                // Seleciona o texto encontrado no controle de edição
+                SendMessage(hEdit, EM_SETSEL, start, end);
+
+                // Move o cursor para a posição do texto encontrado
+                SendMessage(hEdit, EM_SCROLLCARET, 0, 0);
+
+                // Retorna o foco para o controle de edição
+                SetFocus(hEdit);
+
+                std::cout << "Texto destacado: Início = " << start
+                          << ", Fim = " << end << std::endl;
+            } else {
+                std::cerr << "Erro: Índices de seleção inválidos ("
+                          << start << ", " << end << ")." << std::endl;
+            }
+        } else {
+            MessageBox(hwnd, "Texto não encontrado.", "Pesquisa", MB_OK | MB_ICONINFORMATION);
+            std::cout << "Texto não encontrado: " << findText << std::endl;
+        }
+
+        free(buffer);
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+// Função para abrir o diálogo de substituição                                 //
+/////////////////////////////////////////////////////////////////////////////////
+void ReplaceText(HWND hwnd) {
+    struct ReplaceData {
+        char findText[128];
+        char replaceText[128];
+    } replaceData = { "", "" };
+
+    if (DialogBoxParam(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_REPLACE), hwnd, [](HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) -> INT_PTR {
+        static ReplaceData* pReplaceData = nullptr;
+        switch (uMsg) {
+            case WM_INITDIALOG:
+                pReplaceData = reinterpret_cast<ReplaceData*>(lParam);
+                return TRUE;
+
+            case WM_COMMAND:
+                if (LOWORD(wParam) == IDOK) {
+                    GetDlgItemText(hDlg, IDC_EDIT1, pReplaceData->findText, 128);
+                    GetDlgItemText(hDlg, IDC_EDIT2, pReplaceData->replaceText, 128);
+                    EndDialog(hDlg, IDOK);
+                } else if (LOWORD(wParam) == IDCANCEL) {
+                    EndDialog(hDlg, IDCANCEL);
+                }
+                break;
+        }
+        return FALSE;
+    }, (LPARAM)&replaceData) == IDOK) {
+        // Substitui o texto no controle de edição
+        int length = GetWindowTextLength(hEdit);
+        char* buffer = (char*)malloc(length + 1);
+        GetWindowText(hEdit, buffer, length + 1);
+
+        char* pos = strstr(buffer, replaceData.findText);
+        if (pos) {
+            int start = pos - buffer;
+            int end = start + strlen(replaceData.findText);
+            SendMessage(hEdit, EM_SETSEL, start, end);
+            SendMessage(hEdit, EM_REPLACESEL, TRUE, (LPARAM)replaceData.replaceText);
+            MessageBox(hwnd, "Texto substituído com sucesso.", "Substituição", MB_OK | MB_ICONINFORMATION);
+        } else {
+            MessageBox(hwnd, "Texto não encontrado.", "Substituição", MB_OK | MB_ICONINFORMATION);
+        }
+
+        free(buffer);
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////////////
 // Função para atualizar a barra de status com linha e coluna                  //
@@ -197,6 +327,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case ID_FILE_EXIT:
                     PostQuitMessage(0);
                     break;
+
+                case ID_FIND:
+                    FindText(hwnd);
+                    break;
+
+                case ID_REPLACE:
+                    ReplaceText(hwnd);
+                    break;
             }
             break;
 
@@ -230,7 +368,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     RegisterClassEx(&wc);
 
-    HMENU hMenu = CreateMenu();
+    HMENU hMenu = CreateMenu();  // <-- Cria menu Arquivo
     HMENU hFileMenu = CreateMenu();
     AppendMenu(hFileMenu, MF_STRING, ID_FILE_OPEN, "Abrir\tCtrl-O");
     AppendMenu(hFileMenu, MF_STRING, ID_FILE_SAVE, "Salvar\tCtrl-S");
@@ -238,13 +376,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     AppendMenu(hFileMenu, MF_STRING, ID_FILE_EXIT, "Sair\tCtrl-Q");
     AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hFileMenu, "Arquivo");
 
+    HMENU hEditMenu = CreateMenu(); // <-- Cria menu Editar
+    AppendMenu(hEditMenu, MF_STRING, ID_FIND, "Procurar\tCtrl-F");
+    AppendMenu(hEditMenu, MF_STRING, ID_REPLACE, "Substituir\tCtrl-H");
+    AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hEditMenu, "Editar");
+
+
+
     ACCEL accTable[] = {
         { FCONTROL | FVIRTKEY, 'O', ID_FILE_OPEN },
         { FCONTROL | FVIRTKEY, 'S', ID_FILE_SAVE },
         { FCONTROL | FVIRTKEY, 'N', ID_FILE_NEW },
-        { FCONTROL | FVIRTKEY, 'Q', ID_FILE_EXIT }
+        { FCONTROL | FVIRTKEY, 'Q', ID_FILE_EXIT },
+        { FCONTROL | FVIRTKEY, 'F', ID_FIND },
+        { FCONTROL | FVIRTKEY, 'H', ID_REPLACE }
     };
-    HACCEL hAccel = CreateAcceleratorTable(accTable, 4);
+    HACCEL hAccel = CreateAcceleratorTable(accTable, 6);
 
     HWND hwnd = CreateWindowEx(
         0, CLASS_NAME, "Editor de Texto Simples",
